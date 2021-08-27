@@ -49,6 +49,63 @@
     var viewParamsBuffer = device.createBuffer(
         {size: 16 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
 
+    var sampler = device.createSampler({
+        magFilter: "linear",
+        minFilter: "linear",
+    });
+
+    // Upload the colormap texture
+    var colormapTexture = null;
+    {
+        var colormapImage = new Image();
+        colormapImage.src = colormaps["Cool Warm"];
+        await colormapImage.decode();
+        var imageBitmap = await createImageBitmap(colormapImage);
+
+        colormapTexture = device.createTexture({
+            size: [imageBitmap.width, imageBitmap.height, 1],
+            format: "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
+                       GPUTextureUsage.RENDER_ATTACHMENT
+        });
+
+        var src = {source: imageBitmap};
+        var dst = {texture: colormapTexture};
+        device.queue.copyExternalImageToTexture(
+            src, dst, [imageBitmap.width, imageBitmap.height]);
+    }
+
+    // Fetch and upload the volume
+    var volumeName = "Skull";
+    var volumeDims = getVolumeDimensions(volumes[volumeName]);
+    var volumeTexture = device.createTexture({
+        size: volumeDims,
+        format: "r8unorm",
+        dimension: "3d",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+    });
+    {
+        var volumeData = await fetchVolume(volumes[volumeName]);
+
+        var volumeUploadBuf = device.createBuffer(
+            {size: volumeData.length, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
+        new Uint8Array(volumeUploadBuf.getMappedRange()).set(volumeData);
+        volumeUploadBuf.unmap();
+
+        var commandEncoder = device.createCommandEncoder();
+
+        var src = {
+            buffer: volumeUploadBuf,
+            // NOTE: bytes per row must be multiple of 256
+            bytesPerRow: volumeDims[0],
+            rowsPerImage: volumeDims[1]
+        };
+        var dst = {texture: volumeTexture};
+        commandEncoder.copyBufferToTexture(src, dst, volumeDims);
+
+        await device.queue.submit([commandEncoder.finish()]);
+    }
+
     // Setup render outputs
     var swapChainFormat = 'bgra8unorm';
     context.configure(
@@ -62,12 +119,22 @@
     });
 
     var bindGroupLayout = device.createBindGroupLayout({
-        entries: [{binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {type: "uniform"}}]
+        entries: [
+            {binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {type: "uniform"}},
+            {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {viewDimension: "3d"}},
+            {binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {viewDimension: "2d"}},
+            {binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {type: "filtering"}}
+        ]
     });
 
     var viewParamBG = device.createBindGroup({
         layout: bindGroupLayout,
-        entries: [{binding: 0, resource: {buffer: viewParamsBuffer}}]
+        entries: [
+            {binding: 0, resource: {buffer: viewParamsBuffer}},
+            {binding: 1, resource: volumeTexture.createView()},
+            {binding: 2, resource: colormapTexture.createView()},
+            {binding: 3, resource: sampler},
+        ]
 
     });
 
