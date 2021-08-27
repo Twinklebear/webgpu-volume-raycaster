@@ -16,16 +16,41 @@
             <div class="col-12 text-center">
                 <h4>WebGPU Volume Raycaster</h4>
                 <canvas id="webgpu-canvas" class="img-fluid" width="640" height="480"></canvas>
-                <div class="col-12 alert alert-danger" id="no-webgpu" style="display:none;">
-                    <h4>Error: Your browser does not support WebGPU</h4>
+            </div>
+            <div class="mx-auto col-12 col-lg-8 row">
+                <div class="col-12 col-lg-6 mb-lg-0 mb-2">
+                    Volume: <select id="volumeList" onchange="selectVolume()"></select>
+                </div>
+                <div class="col-12 col-lg-6 mb-lg-0 mb-2">
+                    Colormap: <select id="colormapList" onchange="selectColormap()"></select>
+                </div>
+                <div class="col-12 mt-lg-2 mt-0">
+                    <h4>Controls</h4>
+                    <p>Desktop: Left-click + drag to rotate, scroll to zoom,
+                    right-click + drag to pan.
+                    <br/>
+                    Touch: One finger drag to rotate, pinch to zoom, two finger drag to pan.
+
+                    <p id="loadingText"></p>
+                    <!--<div class="progress mb-2">
+                        <div id="loadingProgressBar" class="progress-bar" role="progressbar"
+                             aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>-->
+                    <h4>Description</h4>
+                    This is a WebGPU implementation of a standard <a href="https://en.wikipedia.org/wiki/Volume_ray_casting">volume raycaster</a>
+                    which uses a single render-pass to raycast the volume. The sampling rate is dynamically
+                    adjusted to maintain an interactive framerate across different devices (desktops, laptops, phones).
+                    <a href="https://github.com/Twinklebear/webgpu-volume-raycaster">
+                        Get the code on GitHub!</a>
                 </div>
             </div>
         </div>
     </div>
     <script src="js/gl-matrix-min.js"></script>
     <script src="js/webgl-util.js"></script>
-    <script src="js/webgpu_triangle.js"></script>
-    <script src="js/worker.js"></script>
+    <script src="js/shader-srcs.js"></script>
+    <script src="js/volume.js"></script>
+    <script src="js/volume-raycaster.js"></script>
 </body>
 </html>
 
