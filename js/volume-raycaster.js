@@ -19,7 +19,8 @@
     if (compilationInfo.messages.length > 0) {
         var hadError = false;
         console.log("Shader compilation log:");
-        for (var msg in compilationInfo.messages) {
+        for (var i = 0; i < compilationInfo.messages.length; ++i) {
+            var msg = compilationInfo.messages[i];
             console.log(`${msg.lineNum}:${msg.linePos} - ${msg.message}`);
             hadError = hadError || msg.type == "error";
         }
@@ -47,7 +48,7 @@
 
     // Create a buffer to store the view parameters
     var viewParamsBuffer = device.createBuffer(
-        {size: 16 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
+        {size: 20 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
 
     var sampler = device.createSampler({
         magFilter: "linear",
@@ -76,7 +77,7 @@
     }
 
     // Fetch and upload the volume
-    var volumeName = "Skull";
+    var volumeName = "Foot";
     var volumeDims = getVolumeDimensions(volumes[volumeName]);
     var volumeTexture = device.createTexture({
         size: volumeDims,
@@ -110,13 +111,6 @@
     var swapChainFormat = 'bgra8unorm';
     context.configure(
         {device: device, format: swapChainFormat, usage: GPUTextureUsage.OUTPUT_ATTACHMENT});
-
-    var depthFormat = 'depth24plus-stencil8';
-    var depthTexture = device.createTexture({
-        size: {width: canvas.width, height: canvas.height, depth: 1},
-        format: depthFormat,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT
-    });
 
     var bindGroupLayout = device.createBindGroupLayout({
         entries: [
@@ -153,7 +147,13 @@
     var fragmentState = {
         module: shaderModule,
         entryPoint: "fragment_main",
-        targets: [{format: swapChainFormat}]
+        targets: [{
+            format: swapChainFormat,
+            blend: {
+                color: {srcFactor: "one", dstFactor: "one-minus-src-alpha"},
+                alpha: {srcFactor: "one", dstFactor: "one-minus-src-alpha"}
+            }
+        }]
     };
 
     var renderPipeline = device.createRenderPipeline({
@@ -163,19 +163,12 @@
         primitive: {
             topology: "triangle-strip",
             stripIndexFormat: "uint16",
-        },
-        depthStencil: {format: depthFormat, depthWriteEnabled: true, depthCompare: 'less'}
+            cullMode: "front",
+        }
     });
 
     var renderPassDesc = {
-        colorAttachments: [{attachment: undefined, loadValue: [0.3, 0.3, 0.3, 1]}],
-        depthStencilAttachment: {
-            view: depthTexture.createView(),
-            depthLoadValue: 1.0,
-            depthStoreOp: 'store',
-            stencilLoadValue: 0,
-            stencilStoreOp: 'store'
-        }
+        colorAttachments: [{attachment: undefined, loadValue: [0.3, 0.3, 0.3, 1]}]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);
@@ -208,12 +201,17 @@
             projView = mat4.mul(projView, proj, camera.camera);
 
             var upload = device.createBuffer(
-                {size: 16 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
-            new Float32Array(upload.getMappedRange()).set(projView);
-            upload.unmap();
+                {size: 20 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
+            {
+                var eyePos = camera.eyePos();
+                var map = new Float32Array(upload.getMappedRange());
+                map.set(projView);
+                map.set(eyePos, projView.length);
+                upload.unmap();
+            }
 
             var commandEncoder = device.createCommandEncoder();
-            commandEncoder.copyBufferToBuffer(upload, 0, viewParamsBuffer, 0, 16 * 4);
+            commandEncoder.copyBufferToBuffer(upload, 0, viewParamsBuffer, 0, 20 * 4);
 
             renderPassDesc.colorAttachments[0].view = context.getCurrentTexture().createView();
             var renderPass = commandEncoder.beginRenderPass(renderPassDesc);

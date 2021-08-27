@@ -1,7 +1,8 @@
 'use strict';
 // Compute the view frustum in world space from the provided
 // column major projection * view matrix
-var Frustum = function(projView) {
+var Frustum =
+    function(projView) {
     var rows = [vec4.create(), vec4.create(), vec4.create(), vec4.create()];
     for (var i = 0; i < rows.length; ++i) {
         rows[i] = vec4.set(rows[i], projView[i], projView[4 + i],
@@ -62,11 +63,12 @@ var Frustum = function(projView) {
     }
 }
 
-// Check if the box is contained in the Frustum
-// The box should be [x_lower, y_lower, z_lower, x_upper, y_upper, z_upper]
-// This is done using Inigo Quilez's approach to help with large
-// bounds: https://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
-Frustum.prototype.containsBox = function(box) {
+    // Check if the box is contained in the Frustum
+    // The box should be [x_lower, y_lower, z_lower, x_upper, y_upper, z_upper]
+    // This is done using Inigo Quilez's approach to help with large
+    // bounds: https://www.iquilezles.org/www/articles/frustumcorrect/frustumcorrect.htm
+    Frustum.prototype.containsBox =
+        function(box) {
     // Test the box against each plane
     var vec = vec4.create();
     var out = 0;
@@ -153,8 +155,8 @@ Frustum.prototype.containsBox = function(box) {
     return true;
 }
 
-
-var Shader = function(gl, vertexSrc, fragmentSrc) {
+var Shader =
+    function(gl, vertexSrc, fragmentSrc) {
     var self = this;
     this.program = compileShader(gl, vertexSrc, fragmentSrc);
 
@@ -184,14 +186,16 @@ var Shader = function(gl, vertexSrc, fragmentSrc) {
     }
 }
 
-Shader.prototype.use = function(gl) {
+    Shader.prototype.use =
+        function(gl) {
     gl.useProgram(this.program);
 }
 
 // Compile and link the shaders vert and frag. vert and frag should contain
 // the shader source code for the vertex and fragment shaders respectively
 // Returns the compiled and linked program, or null if compilation or linking failed
-var compileShader = function(gl, vert, frag){
+var compileShader =
+    function(gl, vert, frag) {
     var vs = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vs, vert);
     gl.compileShader(vs);
@@ -222,7 +226,8 @@ var compileShader = function(gl, vert, frag){
     return program;
 }
 
-var getGLExtension = function(ext) {
+var getGLExtension =
+    function(ext) {
     if (!gl.getExtension(ext)) {
         alert("Missing " + ext + " WebGL extension");
         return false;
@@ -236,7 +241,8 @@ var getGLExtension = function(ext) {
  * so the mouse positions can be normalized into [-1, 1] from the pixel
  * coordinates.
  */
-var ArcballCamera = function(eye, center, up, zoomSpeed, screenDims) {
+var ArcballCamera =
+    function(eye, center, up, zoomSpeed, screenDims) {
     var veye = vec3.set(vec3.create(), eye[0], eye[1], eye[2]);
     var vcenter = vec3.set(vec3.create(), center[0], center[1], center[2]);
     var vup = vec3.set(vec3.create(), up[0], up[1], up[2]);
@@ -276,7 +282,8 @@ var ArcballCamera = function(eye, center, up, zoomSpeed, screenDims) {
     this.updateCameraMatrix();
 }
 
-ArcballCamera.prototype.rotate = function(prevMouse, curMouse) {
+    ArcballCamera.prototype.rotate =
+        function(prevMouse, curMouse) {
     var mPrev = vec2.set(vec2.create(),
         clamp(prevMouse[0] * 2.0 * this.invScreen[0] - 1.0, -1.0, 1.0),
         clamp(1.0 - prevMouse[1] * 2.0 * this.invScreen[1], -1.0, 1.0));
@@ -294,7 +301,8 @@ ArcballCamera.prototype.rotate = function(prevMouse, curMouse) {
     this.updateCameraMatrix();
 }
 
-ArcballCamera.prototype.zoom = function(amount) {
+        ArcballCamera.prototype.zoom =
+            function(amount) {
     var vt = vec3.set(vec3.create(), 0.0, 0.0, amount * this.invScreen[1] * this.zoomSpeed);
     var t = mat4.fromTranslation(mat4.create(), vt);
     this.translation = mat4.mul(this.translation, t, this.translation);
@@ -304,7 +312,8 @@ ArcballCamera.prototype.zoom = function(amount) {
     this.updateCameraMatrix();
 }
 
-ArcballCamera.prototype.pan = function(mouseDelta) {
+            ArcballCamera.prototype.pan =
+                function(mouseDelta) {
     var delta = vec4.set(vec4.create(), mouseDelta[0] * this.invScreen[0] * Math.abs(this.translation[14]),
         mouseDelta[1] * this.invScreen[1] * Math.abs(this.translation[14]), 0, 0);
     var worldDelta = vec4.transformMat4(vec4.create(), delta, this.invCamera);
@@ -313,7 +322,8 @@ ArcballCamera.prototype.pan = function(mouseDelta) {
     this.updateCameraMatrix();
 }
 
-ArcballCamera.prototype.updateCameraMatrix = function() {
+                ArcballCamera.prototype.updateCameraMatrix =
+                    function() {
     // camera = translation * rotation * centerTranslation
     var rotMat = mat4.fromQuat(mat4.create(), this.rotation);
     this.camera = mat4.mul(this.camera, rotMat, this.centerTranslation);
@@ -321,25 +331,29 @@ ArcballCamera.prototype.updateCameraMatrix = function() {
     this.invCamera = mat4.invert(this.invCamera, this.camera);
 }
 
-ArcballCamera.prototype.eyePos = function() {
-    return [camera.invCamera[12], camera.invCamera[13], camera.invCamera[14]];
+                    ArcballCamera.prototype.eyePos =
+                        function() {
+    return [this.invCamera[12], this.invCamera[13], this.invCamera[14]];
 }
 
-ArcballCamera.prototype.eyeDir = function() {
+                        ArcballCamera.prototype.eyeDir =
+                            function() {
     var dir = vec4.set(vec4.create(), 0.0, 0.0, -1.0, 0.0);
     dir = vec4.transformMat4(dir, dir, this.invCamera);
     dir = vec4.normalize(dir, dir);
     return [dir[0], dir[1], dir[2]];
 }
 
-ArcballCamera.prototype.upDir = function() {
+                            ArcballCamera.prototype.upDir =
+                                function() {
     var dir = vec4.set(vec4.create(), 0.0, 1.0, 0.0, 0.0);
     dir = vec4.transformMat4(dir, dir, this.invCamera);
     dir = vec4.normalize(dir, dir);
     return [dir[0], dir[1], dir[2]];
 }
 
-var screenToArcball = function(p) {
+var screenToArcball =
+    function(p) {
     var dist = vec2.dot(p, p);
     if (dist <= 1.0) {
         return quat.set(quat.create(), p[0], p[1], Math.sqrt(1.0 - dist), 0);
@@ -349,17 +363,19 @@ var screenToArcball = function(p) {
         // glmatrix is x, y, z, w
         return quat.set(quat.create(), unitP[0], unitP[1], 0, 0);
     }
-}
-var clamp = function(a, min, max) {
+} var clamp =
+        function(a, min, max) {
     return a < min ? min : a > max ? max : a;
 }
 
-var pointDist = function(a, b) {
+var pointDist =
+    function(a, b) {
     var v = [b[0] - a[0], b[1] - a[1]];
     return Math.sqrt(Math.pow(v[0], 2.0) + Math.pow(v[1], 2.0));
 }
 
-var Buffer = function(capacity, dtype) {
+var Buffer =
+    function(capacity, dtype) {
     this.len = 0;
     this.capacity = capacity;
     if (dtype == "uint8") {
@@ -383,7 +399,8 @@ var Buffer = function(capacity, dtype) {
     }
 }
 
-Buffer.prototype.append = function(buf) {
+    Buffer.prototype.append =
+        function(buf) {
     if (this.len + buf.length >= this.capacity) {
         var newCap = Math.floor(this.capacity * 1.5);
         var tmp = new (this.buffer.constructor)(newCap);
@@ -396,22 +413,26 @@ Buffer.prototype.append = function(buf) {
     this.len += buf.length;
 }
 
-Buffer.prototype.clear = function() {
+        Buffer.prototype.clear =
+            function() {
     this.len = 0;
 }
 
-Buffer.prototype.stride = function() {
+            Buffer.prototype.stride =
+                function() {
     return this.buffer.BYTES_PER_ELEMENT;
 }
 
-Buffer.prototype.view = function(offset, length) {
+                Buffer.prototype.view =
+                    function(offset, length) {
     return new (this.buffer.constructor)(this.buffer.buffer, offset, length);
 }
 
 // Various utilities that don't really fit anywhere else
 
 // Parse the hex string to RGB values in [0, 255]
-var hexToRGB = function(hex) {
+var hexToRGB =
+    function(hex) {
     var val = parseInt(hex.substr(1), 16);
     var r = (val >> 16) & 255;
     var g = (val >> 8) & 255;
@@ -420,7 +441,8 @@ var hexToRGB = function(hex) {
 }
 
 // Parse the hex string to RGB values in [0, 1]
-var hexToRGBf = function(hex) {
+var hexToRGBf =
+    function(hex) {
     var c = hexToRGB(hex);
     return [c[0] / 255.0, c[1] / 255.0, c[2] / 255.0];
 }
@@ -442,7 +464,8 @@ var hexToRGBf = function(hex) {
  * twoFingerDrag: function(dragVector)
  *     two finger drag, receives the drag movement amount
  */
-var Controller = function() {
+var Controller =
+    function() {
     this.mousemove = null;
     this.press = null;
     this.wheel = null;
@@ -450,7 +473,7 @@ var Controller = function() {
     this.pinch = null;
 }
 
-Controller.prototype.registerForCanvas = function(canvas) {
+    Controller.prototype.registerForCanvas = function(canvas) {
     var prevMouse = null;
     var mouseState = [false, false];
     var self = this;
@@ -599,4 +622,3 @@ Controller.prototype.registerForCanvas = function(canvas) {
     canvas.addEventListener("touchcancel", touchEnd);
     canvas.addEventListener("touchend", touchEnd);
 }
-
