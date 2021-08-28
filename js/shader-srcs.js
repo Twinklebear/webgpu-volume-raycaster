@@ -83,8 +83,8 @@ fn fragment_main(in: VertexOutput) -> [[location(0)]] float4 {
 	var dt = dt_scale * min(dt_vec.x, min(dt_vec.y, dt_vec.z));
 	var p = in.transformed_eye + t_hit.x * ray_dir;
 	for (var t = t_hit.x; t < t_hit.y; t = t + dt) {
-		var val = textureSample(volume, tex_sampler, p).r;
-		var val_color = float4(textureSample(colormap, tex_sampler, float2(val, 0.5)).rgb, val);
+		var val = textureSampleLevel(volume, tex_sampler, p, 0.0).r;
+		var val_color = float4(textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).rgb, val);
 		// Opacity correction
 		val_color.a = 1.0 - pow(1.0 - val_color.a, dt_scale);
         // WGSL can't do left hand size swizzling!?!?
