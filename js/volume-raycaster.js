@@ -168,7 +168,7 @@
     });
 
     var renderPassDesc = {
-        colorAttachments: [{attachment: undefined, loadValue: [0.3, 0.3, 0.3, 1]}]
+        colorAttachments: [{view: undefined, loadValue: [0.3, 0.3, 0.3, 1]}]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);
