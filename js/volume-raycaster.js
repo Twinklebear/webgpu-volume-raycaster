@@ -1,7 +1,7 @@
 (async () => {
     if (!navigator.gpu) {
-        document.getElementById('webgpu-canvas').setAttribute('style', 'display:none;');
-        document.getElementById('no-webgpu').setAttribute('style', 'display:block;');
+        document.getElementById("webgpu-canvas").setAttribute("style", "display:none;");
+        document.getElementById("no-webgpu").setAttribute("style", "display:block;");
         return;
     }
 
@@ -10,8 +10,8 @@
     var device = await adapter.requestDevice();
 
     // Get a context to display our rendered image on the canvas
-    var canvas = document.getElementById('webgpu-canvas');
-    var context = canvas.getContext('webgpu');
+    var canvas = document.getElementById("webgpu-canvas");
+    var context = canvas.getContext("webgpu");
 
     // Setup shader modules
     var shaderModule = device.createShaderModule({code: shaderCode});
@@ -108,7 +108,7 @@
     }
 
     // Setup render outputs
-    var swapChainFormat = 'bgra8unorm';
+    var swapChainFormat = "bgra8unorm";
     context.configure(
         {device: device, format: swapChainFormat, usage: GPUTextureUsage.OUTPUT_ATTACHMENT});
 
@@ -140,7 +140,7 @@
         entryPoint: "vertex_main",
         buffers: [{
             arrayStride: 3 * 4,
-            attributes: [{format: 'float32x3', offset: 0, shaderLocation: 0}]
+            attributes: [{format: "float32x3", offset: 0, shaderLocation: 0}]
         }]
     };
 
