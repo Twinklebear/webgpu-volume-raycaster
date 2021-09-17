@@ -8,6 +8,14 @@ module.exports = {
         filename: "main.js",
         path: path.resolve(__dirname, "dist"),
     },
+    module: {
+        rules: [
+            {
+                test: /\.(png|jpg|jpeg)$/i,
+                type: "asset/resource",
+            }
+        ]
+    },
     plugins: [
         new HtmlWebpackPlugin({
             template: "./index.html",

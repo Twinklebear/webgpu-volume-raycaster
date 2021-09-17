@@ -1,7 +1,6 @@
-import {vec3, mat4} from "gl-matrix";
+import {mat4, vec3} from "gl-matrix";
 
 import {shaderCode} from "./shader-srcs.js";
-// TODO: Try out webpack asset packing for colormaps
 import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from "./volume.js";
 import {ArcballCamera, Controller} from "./webgl-util.min.js";
 
