@@ -1,10 +1,4 @@
-const defaultEye = vec3.set(vec3.create(), 0.5, 0.5, 2.5);
-const center = vec3.set(vec3.create(), 0.5, 0.5, 0.5);
-const up = vec3.set(vec3.create(), 0.0, 1.0, 0.0);
-
-var fileRegex = /.*\/(\w+)_(\d+)x(\d+)x(\d+)_(\w+)\.*/;
-
-var volumes = {
+export const volumes = {
     "Fuel": "7d87jcsh0qodk78/fuel_64x64x64_uint8.raw",
     "Neghip": "zgocya7h33nltu9/neghip_64x64x64_uint8.raw",
     "Hydrogen Atom": "jwbav8s3wmmxd5x/hydrogen_atom_128x128x128_uint8.raw",
@@ -16,7 +10,7 @@ var volumes = {
     "Aneurysm": "3ykigaiym8uiwbp/aneurism_256x256x256_uint8.raw",
 };
 
-var colormaps = {
+export const colormaps = {
     "Cool Warm": "colormaps/cool-warm-paraview.png",
     "Matplotlib Plasma": "colormaps/matplotlib-plasma.png",
     "Matplotlib Virdis": "colormaps/matplotlib-virdis.png",
@@ -25,14 +19,15 @@ var colormaps = {
     "Samsel Linear YGB 1211G": "colormaps/samsel-linear-ygb-1211g.png",
 };
 
-var getVolumeDimensions =
-    function(file) {
+export function getVolumeDimensions(file)
+{
+    var fileRegex = /.*\/(\w+)_(\d+)x(\d+)x(\d+)_(\w+)\.*/;
     var m = file.match(fileRegex);
     return [parseInt(m[2]), parseInt(m[3]), parseInt(m[4])];
 }
 
-var getCubeMesh =
-    function() {
+export function getCubeMesh()
+{
     var cubeVertices = [
         1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0,
         1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0
@@ -45,7 +40,8 @@ var getCubeMesh =
     return {vertices: cubeVertices, indices: cubeIndices};
 }
 
-var fetchVolume = async function(file) {
+export async function fetchVolume(file)
+{
     var url = "https://www.dl.dropboxusercontent.com/s/" + file + "?dl=1";
     // TODO: could later monitor progress here
     var data = await fetch(url).then((res) => res.arrayBuffer().then(function(arr) {

@@ -1,9 +1,20 @@
+import {vec3, mat4} from "gl-matrix";
+
+import {shaderCode} from "./shader-srcs.js";
+// TODO: Try out webpack asset packing for colormaps
+import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from "./volume.js";
+import {ArcballCamera, Controller} from "./webgl-util.min.js";
+
 (async () => {
     if (!navigator.gpu) {
         document.getElementById("webgpu-canvas").setAttribute("style", "display:none;");
         document.getElementById("no-webgpu").setAttribute("style", "display:block;");
         return;
     }
+
+    const defaultEye = vec3.set(vec3.create(), 0.5, 0.5, 2.5);
+    const center = vec3.set(vec3.create(), 0.5, 0.5, 0.5);
+    const up = vec3.set(vec3.create(), 0.0, 1.0, 0.0);
 
     // Get a GPU device to render with
     var adapter = await navigator.gpu.requestAdapter();

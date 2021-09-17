@@ -1,4 +1,4 @@
-const shaderCode =
+export const shaderCode =
     `
 
 // Reduce clutter/keyboard pain
