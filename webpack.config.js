@@ -13,6 +13,10 @@ module.exports = {
             {
                 test: /\.(png|jpg|jpeg)$/i,
                 type: "asset/resource",
+            },
+            {
+                test: /\.wgsl$/i,
+                type: "asset/source",
             }
         ]
     },

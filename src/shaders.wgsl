@@ -1,6 +1,3 @@
-export const shaderCode =
-    `
-
 // Reduce clutter/keyboard pain
 type float2 = vec2<f32>;
 type float3 = vec3<f32>;
@@ -106,4 +103,4 @@ fn fragment_main(in: VertexOutput) -> [[location(0)]] float4 {
     color.b = linear_to_srgb(color.b);
     return color;
 }
-`;
+

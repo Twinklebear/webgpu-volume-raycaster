@@ -1,8 +1,8 @@
-import {mat4, vec3} from "gl-matrix";
 import {ArcballCamera} from "arcball_camera";
 import {Controller} from "ez_canvas_controller";
+import {mat4, vec3} from "gl-matrix";
 
-import {shaderCode} from "./shader-srcs.js";
+import shaderCode from "./shaders.wgsl";
 import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from "./volume.js";
 
 (async () => {
