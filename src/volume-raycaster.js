@@ -206,37 +206,48 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     };
     controller.registerForCanvas(canvas);
 
-    var frame = function() {
-        if (!document.hidden) {
-            // Update camera buffer
-            projView = mat4.mul(projView, proj, camera.camera);
-
-            var upload = device.createBuffer(
-                {size: 20 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
-            {
-                var eyePos = camera.eyePos();
-                var map = new Float32Array(upload.getMappedRange());
-                map.set(projView);
-                map.set(eyePos, projView.length);
-                upload.unmap();
-            }
-
-            var commandEncoder = device.createCommandEncoder();
-            commandEncoder.copyBufferToBuffer(upload, 0, viewParamsBuffer, 0, 20 * 4);
-
-            renderPassDesc.colorAttachments[0].view = context.getCurrentTexture().createView();
-            var renderPass = commandEncoder.beginRenderPass(renderPassDesc);
-
-            renderPass.setPipeline(renderPipeline);
-            renderPass.setBindGroup(0, viewParamBG);
-            renderPass.setVertexBuffer(0, vertexBuffer);
-            renderPass.setIndexBuffer(indexBuffer, "uint16");
-            renderPass.draw(cube.vertices.length / 3, 1, 0, 0);
-
-            renderPass.endPass();
-            device.queue.submit([commandEncoder.finish()]);
-        }
-        requestAnimationFrame(frame);
+    var animationFrame = function() {
+        var resolve = null;
+        var promise = new Promise(r => resolve = r);
+        window.requestAnimationFrame(resolve);
+        return promise
     };
-    requestAnimationFrame(frame);
+    requestAnimationFrame(animationFrame);
+
+    while (true) {
+        await animationFrame();
+        if (document.hidden) {
+            continue;
+        }
+        // Update camera buffer
+        projView = mat4.mul(projView, proj, camera.camera);
+
+        var upload = device.createBuffer(
+            {size: 20 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
+        {
+            var eyePos = camera.eyePos();
+            var map = new Float32Array(upload.getMappedRange());
+            map.set(projView);
+            map.set(eyePos, projView.length);
+            upload.unmap();
+        }
+
+        var commandEncoder = device.createCommandEncoder();
+        commandEncoder.copyBufferToBuffer(upload, 0, viewParamsBuffer, 0, 20 * 4);
+
+        renderPassDesc.colorAttachments[0].view = context.getCurrentTexture().createView();
+        var renderPass = commandEncoder.beginRenderPass(renderPassDesc);
+
+        renderPass.setPipeline(renderPipeline);
+        renderPass.setBindGroup(0, viewParamBG);
+        renderPass.setVertexBuffer(0, vertexBuffer);
+        renderPass.setIndexBuffer(indexBuffer, "uint16");
+        renderPass.draw(cube.vertices.length / 3, 1, 0, 0);
+
+        renderPass.endPass();
+        device.queue.submit([commandEncoder.finish()]);
+
+        // Explicitly release the GPU buffer instead of waiting for GC
+        upload.destroy();
+    }
 })();
