@@ -1,8 +1,9 @@
 import {mat4, vec3} from "gl-matrix";
+import {ArcballCamera} from "arcball_camera";
+import {Controller} from "ez_canvas_controller";
 
 import {shaderCode} from "./shader-srcs.js";
 import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from "./volume.js";
-import {ArcballCamera, Controller} from "./webgl-util.min.js";
 
 (async () => {
     if (!navigator.gpu) {
