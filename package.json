@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "build": "webpack",
-    "serve": "webpack serve"
+    "serve": "webpack server",
+    "deploy": "webpack --mode=production"
   },
   "repository": {
     "type": "git",

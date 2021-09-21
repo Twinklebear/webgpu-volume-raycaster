@@ -12,12 +12,12 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         return;
     }
 
-    const defaultEye = vec3.set(vec3.create(), 0.5, 0.5, 2.5);
-    const center = vec3.set(vec3.create(), 0.5, 0.5, 0.5);
-    const up = vec3.set(vec3.create(), 0.0, 1.0, 0.0);
-
-    // Get a GPU device to render with
     var adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) {
+        document.getElementById("webgpu-canvas").setAttribute("style", "display:none;");
+        document.getElementById("no-webgpu").setAttribute("style", "display:block;");
+        return;
+    }
     var device = await adapter.requestDevice();
 
     // Get a context to display our rendered image on the canvas
@@ -40,6 +40,10 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
             return;
         }
     }
+
+    const defaultEye = vec3.set(vec3.create(), 0.5, 0.5, 2.5);
+    const center = vec3.set(vec3.create(), 0.5, 0.5, 0.5);
+    const up = vec3.set(vec3.create(), 0.0, 1.0, 0.0);
 
     const cube = getCubeMesh();
 
