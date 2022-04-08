@@ -4,37 +4,36 @@ type float3 = vec3<f32>;
 type float4 = vec4<f32>;
 
 struct VertexInput {
-    [[location(0)]] position: float3;
+    @location(0) position: float3,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] position: float4;
-    [[location(0)]] transformed_eye: float3;
-    [[location(1)]] ray_dir: float3;
+    @builtin(position) position: float4,
+    @location(0) transformed_eye: float3,
+    @location(1) ray_dir: float3,
 };
 
-[[block]]
 struct ViewParams {
-    proj_view: mat4x4<f32>;
+    proj_view: mat4x4<f32>,
     // Not sure on WGSL padding/alignment rules for blocks,
     // just assume align/pad to vec4
-    eye_pos: float4;
+    eye_pos: float4,
     //volume_scale: float4;
 };
 
-[[group(0), binding(0)]]
+@group(0) @binding(0)
 var<uniform> view_params: ViewParams;
 
-[[group(0), binding(1)]]
+@group(0) @binding(1)
 var volume: texture_3d<f32>;
 
-[[group(0), binding(2)]]
+@group(0) @binding(2)
 var colormap: texture_2d<f32>;
 
-[[group(0), binding(3)]]
+@group(0) @binding(3)
 var tex_sampler: sampler;
 
-[[stage(vertex)]]
+@stage(vertex)
 fn vertex_main(vert: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     var pos = vert.position;
@@ -64,8 +63,8 @@ fn linear_to_srgb(x: f32) -> f32 {
 	return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
 }
 
-[[stage(fragment)]]
-fn fragment_main(in: VertexOutput) -> [[location(0)]] float4 {
+@stage(fragment)
+fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     var ray_dir = normalize(in.ray_dir);
 
 	var t_hit = intersect_box(in.transformed_eye, ray_dir);

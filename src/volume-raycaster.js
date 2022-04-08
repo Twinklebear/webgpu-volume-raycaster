@@ -183,7 +183,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     });
 
     var renderPassDesc = {
-        colorAttachments: [{view: undefined, loadValue: [0.3, 0.3, 0.3, 1]}]
+        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.3, 0.3, 0.3, 1]}]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);
@@ -248,7 +248,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         renderPass.setIndexBuffer(indexBuffer, "uint16");
         renderPass.draw(cube.vertices.length / 3, 1, 0, 0);
 
-        renderPass.endPass();
+        renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
 
         // Explicitly release the GPU buffer instead of waiting for GC
