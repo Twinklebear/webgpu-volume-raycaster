@@ -2,6 +2,67 @@
 type float2 = vec2<f32>;
 type float3 = vec3<f32>;
 type float4 = vec4<f32>;
+type uint2 = vec4<u32>;
+
+// TODO: Would need to write a custom webpack loader for wgsl that
+// processes #include to be able to #include this
+struct LCGRand {
+     state: u32;
+};
+
+fn murmur_hash3_mix(hash_in: u32, k_in: u32) -> u32
+{
+    let c1 = 0xcc9e2d51u;
+    let c2 = 0x1b873593u;
+    let r1 = 15u;
+    let r2 = 13u;
+    let m = 5u;
+    let n = 0xe6546b64u;
+
+    var k = k_in * c1;
+    k = (k << r1) | (k >> (32u - r1));
+    k *= c2;
+
+    var hash = hash_in ^ k;
+    hash = ((hash << r2) | (hash >> (32u - r2))) * m + n;
+
+    return hash;
+}
+
+fn murmur_hash3_finalize(hash_in: u32) -> u32
+{
+    var hash = hash_in ^ (hash_in >> 16u);
+    hash *= 0x85ebca6bu;
+    hash ^= hash >> 13u;
+    hash *= 0xc2b2ae35u;
+    hash ^= hash >> 16u;
+
+    return hash;
+}
+
+fn lcg_random(rng: ptr<function, LCGRand>) -> u32
+{
+    let m = 1664525u;
+    let n = 1013904223u;
+    // WGSL please Add an arrow operator or only use refs/inout
+    // This is really a pain
+    (*rng).state = (*rng).state * m + n;
+    return (*rng).state;
+}
+
+fn lcg_randomf(rng: ptr<function, LCGRand>) -> f32
+{
+	return ldexp(f32(lcg_random(rng)), -32);
+}
+
+fn get_rng(frame_id: u32, pixel: uint2, dims: uint2) -> LCGRand
+{
+    var rng: LCGRand;
+    rng.state = murmur_hash3_mix(0u, pixel.x + pixel.y * dims.x);
+    rng.state = murmur_hash3_mix(rng.state, frame_id);
+    rng.state = murmur_hash3_finalize(rng.state);
+    return rng;
+}
 
 struct VertexInput {
     @location(0) position: float3;
