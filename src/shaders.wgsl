@@ -2,7 +2,8 @@
 type float2 = vec2<f32>;
 type float3 = vec3<f32>;
 type float4 = vec4<f32>;
-type uint2 = vec4<u32>;
+type uint2 = vec2<u32>;
+type int2 = vec2<i32>;
 
 // TODO: Would need to write a custom webpack loader for wgsl that
 // processes #include to be able to #include this
@@ -55,10 +56,10 @@ fn lcg_randomf(rng: ptr<function, LCGRand>) -> f32
 	return ldexp(f32(lcg_random(rng)), -32);
 }
 
-fn get_rng(frame_id: u32, pixel: uint2, dims: uint2) -> LCGRand
+fn get_rng(frame_id: u32, pixel: int2, dims: int2) -> LCGRand
 {
     var rng: LCGRand;
-    rng.state = murmur_hash3_mix(0u, pixel.x + pixel.y * dims.x);
+    rng.state = murmur_hash3_mix(0u, u32(pixel.x + pixel.y * dims.x));
     rng.state = murmur_hash3_mix(rng.state, frame_id);
     rng.state = murmur_hash3_finalize(rng.state);
     return rng;
@@ -80,6 +81,7 @@ struct ViewParams {
     // just assume align/pad to vec4
     eye_pos: float4;
     //volume_scale: float4;
+    frame_id: u32;
 };
 
 @group(0) @binding(0)
@@ -93,6 +95,13 @@ var colormap: texture_2d<f32>;
 
 @group(0) @binding(3)
 var tex_sampler: sampler;
+
+// Why can't we read from storage textures or read/write from one?
+@group(0) @binding(4)
+var accum_buffer_in: texture_2d<f32>;
+
+@group(0) @binding(5)
+var accum_buffer_out: texture_storage_2d<rgba32float, write>;
 
 @stage(vertex)
 fn vertex_main(vert: VertexInput) -> VertexOutput {
@@ -134,29 +143,56 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 	}
 	t_hit.x = max(t_hit.x, 0.0);
 
+    // TODO: Need to pass pixel coords and frame ID, set up accumulation buffer
+    // Can I write w/ ADD op to a non-normalized framebuffer?
+    let pixel = int2(i32(in.position.x), i32(in.position.y));
+    var rng = get_rng(view_params.frame_id, pixel, int2(1280, 720));
+
+    var sigma_t_scale = 250.0;
+    var sigma_s_scale = 250.0;
+
+    // This should just be 1 for the max density in scivis
+    var inv_max_density = 1.0;
+
     var color = float4(0.0);
-	var dt_vec = 1.0 / (float3(256.0) * abs(ray_dir));
-    var dt_scale = 1.0;
-	var dt = dt_scale * min(dt_vec.x, min(dt_vec.y, dt_vec.z));
-	var p = in.transformed_eye + t_hit.x * ray_dir;
-	for (var t = t_hit.x; t < t_hit.y; t = t + dt) {
-		var val = textureSampleLevel(volume, tex_sampler, p, 0.0).r;
-		var val_color = float4(textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).rgb, val);
-		// Opacity correction
-		val_color.a = 1.0 - pow(1.0 - val_color.a, dt_scale);
-        // WGSL can't do left hand size swizzling!?!?
-        // https://github.com/gpuweb/gpuweb/issues/737 
-        // That's ridiculous for a shader language.
-        var tmp = color.rgb + (1.0 - color.a) * val_color.a * val_color.xyz; 
-		color.r = tmp.r;
-		color.g = tmp.g;
-		color.b = tmp.b;
-		color.a = color.a + (1.0 - color.a) * val_color.a;
-		if (color.a >= 0.95) {
-			break;
-		}
-		p = p + ray_dir * dt;
-	}
+    var transmittance = 1.0;
+
+    var t = t_hit.x;
+    // Sample the next scattering event in the volume
+    var scattering_event = false;
+    var sample_color = float3(0.0);
+    var sample_transmittance = 0.0;
+    loop {
+        let samples = float2(lcg_randomf(&rng), lcg_randomf(&rng));
+
+        t -= log(1.0 - samples.x) / sigma_t_scale;
+        if (t >= t_hit.y) {
+            break;
+        }
+
+        var p = in.transformed_eye + t * ray_dir;
+        var val = textureSampleLevel(volume, tex_sampler, p, 0.0).r;
+        // TODO: opacity from transfer function in UI instead of just based on the scalar value
+        //var sample_opacity = textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).a;
+        // Here the sigma t scale will cancel out
+        if (val > samples.y) {
+            scattering_event = true;
+            sample_color = textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).rgb;
+            sample_transmittance = (1.0 - val);
+            break;
+        }
+    }
+    color = float4(sample_color, 1.0);
+
+    // Accumulate into the accumulation buffer for progressive accumulation 
+    var accum_color = float4(0.0);
+    if (view_params.frame_id > 0u) {
+        accum_color = textureLoad(accum_buffer_in, pixel, 0);
+    }
+    accum_color += color;
+    textureStore(accum_buffer_out, pixel, accum_color);
+
+    color = accum_color / f32(view_params.frame_id + 1u);
 
     color.r = linear_to_srgb(color.r);
     color.g = linear_to_srgb(color.g);

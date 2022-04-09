@@ -63,7 +63,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
 
     // Create a buffer to store the view parameters
     var viewParamsBuffer = device.createBuffer(
-        {size: 20 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
+        {size: 21 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
 
     var sampler = device.createSampler({
         magFilter: "linear",
@@ -122,6 +122,24 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         await device.queue.submit([commandEncoder.finish()]);
     }
 
+    // We need to ping-pong the accumulation buffers because read-write storage textures are
+    // missing and we can't have the same texture bound as both a read texture and storage
+    // texture
+    var accumBuffers = [
+        device.createTexture({
+            size: [canvas.width, canvas.height, 1],
+            format: "rgba32float",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING
+        }),
+        device.createTexture({
+            size: [canvas.width, canvas.height, 1],
+            format: "rgba32float",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING
+        })
+    ];
+
+    var accumBufferViews = [accumBuffers[0].createView(), accumBuffers[1].createView()];
+
     // Setup render outputs
     var swapChainFormat = "bgra8unorm";
     context.configure(
@@ -129,22 +147,29 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
 
     var bindGroupLayout = device.createBindGroupLayout({
         entries: [
-            {binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {type: "uniform"}},
+            {
+                binding: 0,
+                visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+                buffer: {type: "uniform"}
+            },
             {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {viewDimension: "3d"}},
             {binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {viewDimension: "2d"}},
-            {binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {type: "filtering"}}
+            {binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {type: "filtering"}},
+            {
+                binding: 4,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: {sampleType: "unfilterable-float", viewDimension: "2d"}
+            },
+            {
+                binding: 5,
+                visibility: GPUShaderStage.FRAGMENT,
+                storageTexture: {
+                    // Would be great to have read-write back
+                    access: "write-only",
+                    format: "rgba32float"
+                }
+            },
         ]
-    });
-
-    var viewParamBG = device.createBindGroup({
-        layout: bindGroupLayout,
-        entries: [
-            {binding: 0, resource: {buffer: viewParamsBuffer}},
-            {binding: 1, resource: volumeTexture.createView()},
-            {binding: 2, resource: colormapTexture.createView()},
-            {binding: 3, resource: sampler},
-        ]
-
     });
 
     // Create render pipeline
@@ -183,7 +208,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     });
 
     var renderPassDesc = {
-        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.3, 0.3, 0.3, 1]}]
+        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.0, 0.0, 0.0, 1]}]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);
@@ -191,21 +216,27 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         mat4.create(), 50 * Math.PI / 180.0, canvas.width / canvas.height, 0.1, 100);
     var projView = mat4.create();
 
+    var frameId = 0;
+
     // Register mouse and touch listeners
     var controller = new Controller();
     controller.mousemove = function(prev, cur, evt) {
         if (evt.buttons == 1) {
+            frameId = 0;
             camera.rotate(prev, cur);
 
         } else if (evt.buttons == 2) {
+            frameId = 0;
             camera.pan([cur[0] - prev[0], prev[1] - cur[1]]);
         }
     };
     controller.wheel = function(amt) {
+        frameId = 0;
         camera.zoom(amt);
     };
     controller.pinch = controller.wheel;
     controller.twoFingerDrag = function(drag) {
+        frameId = 0;
         camera.pan(drag);
     };
     controller.registerForCanvas(canvas);
@@ -218,6 +249,16 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     };
     requestAnimationFrame(animationFrame);
 
+    var bindGroupEntries = [
+        {binding: 0, resource: {buffer: viewParamsBuffer}},
+        {binding: 1, resource: volumeTexture.createView()},
+        {binding: 2, resource: colormapTexture.createView()},
+        {binding: 3, resource: sampler},
+        // Updated each frame because we need to ping pong the accumulation buffers
+        {binding: 4, resource: null},
+        {binding: 5, resource: null}
+    ];
+
     while (true) {
         await animationFrame();
         if (document.hidden) {
@@ -227,23 +268,34 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         projView = mat4.mul(projView, proj, camera.camera);
 
         var upload = device.createBuffer(
-            {size: 20 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
+            {size: 21 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
         {
             var eyePos = camera.eyePos();
-            var map = new Float32Array(upload.getMappedRange());
-            map.set(projView);
-            map.set(eyePos, projView.length);
+            var map = upload.getMappedRange();
+            var f32map = new Float32Array(map);
+            f32map.set(projView);
+            f32map.set(eyePos, projView.length);
+
+            var u32map = new Uint32Array(map);
+            u32map.set([frameId], 20);
+
             upload.unmap();
         }
 
+        bindGroupEntries[4].resource = accumBufferViews[frameId % 2];
+        bindGroupEntries[5].resource = accumBufferViews[(frameId + 1) % 2];
+
+        var bindGroup =
+            device.createBindGroup({layout: bindGroupLayout, entries: bindGroupEntries});
+
         var commandEncoder = device.createCommandEncoder();
-        commandEncoder.copyBufferToBuffer(upload, 0, viewParamsBuffer, 0, 20 * 4);
+        commandEncoder.copyBufferToBuffer(upload, 0, viewParamsBuffer, 0, 21 * 4);
 
         renderPassDesc.colorAttachments[0].view = context.getCurrentTexture().createView();
         var renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
         renderPass.setPipeline(renderPipeline);
-        renderPass.setBindGroup(0, viewParamBG);
+        renderPass.setBindGroup(0, bindGroup);
         renderPass.setVertexBuffer(0, vertexBuffer);
         renderPass.setIndexBuffer(indexBuffer, "uint16");
         renderPass.draw(cube.vertices.length / 3, 1, 0, 0);
@@ -253,5 +305,6 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
 
         // Explicitly release the GPU buffer instead of waiting for GC
         upload.destroy();
+        frameId += 1;
     }
 })();
