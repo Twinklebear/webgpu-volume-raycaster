@@ -84,6 +84,11 @@ struct ViewParams {
     frame_id: u32;
 };
 
+// TODO: Become user params
+var<private> sigma_t_scale: f32 = 200.0;
+var<private> sigma_s_scale: f32 = 1.0;
+
+
 @group(0) @binding(0)
 var<uniform> view_params: ViewParams;
 
@@ -133,6 +138,48 @@ fn linear_to_srgb(x: f32) -> f32 {
 	return 1.055 * pow(x, 1.0 / 2.4) - 0.055;
 }
 
+struct SamplingResult {
+    scattering_event: bool;
+    color: float3;
+    transmittance: f32;
+};
+
+fn sample_woodcock(orig: float3,
+                   dir: float3,
+                   interval: float2,
+                   t: ptr<function, f32>,
+                   rng: ptr<function, LCGRand>)
+                   -> SamplingResult
+{
+    var result: SamplingResult;
+    result.scattering_event = false;
+    result.color = float3(0.0);
+    result.transmittance = 0.0;
+    loop {
+        let samples = float2(lcg_randomf(rng), lcg_randomf(rng));
+
+        *t -= log(1.0 - samples.x) / sigma_t_scale;
+        if (*t >= interval.y) {
+            break;
+        }
+
+        var p = orig + *t * dir;
+        var val = textureSampleLevel(volume, tex_sampler, p, 0.0).r;
+        // TODO: opacity from transfer function in UI instead of just based on the scalar value
+        // Opacity values from the transfer fcn will already be in [0, 1]
+        var density = val;
+        //var sample_opacity = textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).a;
+        // Here the sigma t scale will cancel out
+        if (density > samples.y) {
+            result.scattering_event = true;
+            result.color = textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).rgb;
+            result.transmittance = (1.0 - val);
+            break;
+        }
+    }
+    return result;
+}
+
 @stage(fragment)
 fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     var ray_dir = normalize(in.ray_dir);
@@ -148,41 +195,34 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
     let pixel = int2(i32(in.position.x), i32(in.position.y));
     var rng = get_rng(view_params.frame_id, pixel, int2(1280, 720));
 
-    var sigma_t_scale = 250.0;
-    var sigma_s_scale = 250.0;
-
     // This should just be 1 for the max density in scivis
     var inv_max_density = 1.0;
 
-    var color = float4(0.0);
+    var illum = float3(0.0);
+    var throughput = float3(1.0);
     var transmittance = 1.0;
 
     var t = t_hit.x;
     // Sample the next scattering event in the volume
-    var scattering_event = false;
-    var sample_color = float3(0.0);
-    var sample_transmittance = 0.0;
-    loop {
-        let samples = float2(lcg_randomf(&rng), lcg_randomf(&rng));
+    for (var i = 0; i < 4; i += 1) {
+        var event = sample_woodcock(in.transformed_eye, ray_dir, t_hit, &t, &rng);
 
-        t -= log(1.0 - samples.x) / sigma_t_scale;
-        if (t >= t_hit.y) {
+        if (!event.scattering_event) {
+            // Illuminate with an "environment light"
+            illum += transmittance * throughput * float3(0.3);
             break;
-        }
-
-        var p = in.transformed_eye + t * ray_dir;
-        var val = textureSampleLevel(volume, tex_sampler, p, 0.0).r;
-        // TODO: opacity from transfer function in UI instead of just based on the scalar value
-        //var sample_opacity = textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).a;
-        // Here the sigma t scale will cancel out
-        if (val > samples.y) {
-            scattering_event = true;
-            sample_color = textureSampleLevel(colormap, tex_sampler, float2(val, 0.5), 0.0).rgb;
-            sample_transmittance = (1.0 - val);
-            break;
+        } else {
+            // TODO: This is modeling the volume as a bit of a funky absorbing/emitting kind of thing?
+            // It also is not scattering in a new direction as we should be.
+            // TODO: Also need to sample a sphere direction here to continue
+            // Should add a transmittance function and do a more proper light sampling to try to add
+            // a direct light + the "environment light"
+            illum += transmittance * throughput * event.color;
+            throughput *= event.color * (1.0 - event.transmittance) * sigma_s_scale;
+            transmittance *= event.transmittance;
         }
     }
-    color = float4(sample_color, 1.0);
+    var color = float4(illum, 1.0);
 
     // Accumulate into the accumulation buffer for progressive accumulation 
     var accum_color = float4(0.0);
@@ -194,9 +234,14 @@ fn fragment_main(in: VertexOutput) -> @location(0) float4 {
 
     color = accum_color / f32(view_params.frame_id + 1u);
 
+    // TODO: background color also needs to be sRGB-mapped, otherwise this
+    // causes the volume bounding box to show up incorrectly b/c of the
+    // differing brightness
+    /*
     color.r = linear_to_srgb(color.r);
     color.g = linear_to_srgb(color.g);
     color.b = linear_to_srgb(color.b);
+    */
     return color;
 }
 

@@ -92,7 +92,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     }
 
     // Fetch and upload the volume
-    var volumeName = "Foot";
+    var volumeName = "Bonsai";
     var volumeDims = getVolumeDimensions(volumes[volumeName]);
     var volumeTexture = device.createTexture({
         size: volumeDims,
@@ -208,7 +208,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     });
 
     var renderPassDesc = {
-        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.0, 0.0, 0.0, 1]}]
+        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.3, 0.3, 0.3, 1]}]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);
