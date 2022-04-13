@@ -3,7 +3,14 @@ import {Controller} from "ez_canvas_controller";
 import {mat4, vec3} from "gl-matrix";
 
 import shaderCode from "./shaders.wgsl";
-import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from "./volume.js";
+import {
+    colormaps,
+    fetchVolume,
+    getCubeMesh,
+    getVolumeDimensions,
+    linearToSRGB,
+    volumes
+} from "./volume.js";
 
 (async () => {
     if (navigator.gpu === undefined) {
@@ -207,8 +214,13 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         }
     });
 
+    var clearColor = linearToSRGB(0.1);
     var renderPassDesc = {
-        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.3, 0.3, 0.3, 1]}]
+        colorAttachments: [{
+            view: undefined,
+            loadOp: "clear",
+            clearValue: [clearColor, clearColor, clearColor, 1]
+        }]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);

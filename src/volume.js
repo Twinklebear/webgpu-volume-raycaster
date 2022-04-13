@@ -63,3 +63,11 @@ export async function fetchVolume(file)
     }
     return data;
 }
+
+export function linearToSRGB(x)
+{
+    if (x <= 0.0031308) {
+        return 12.92 * x;
+    }
+    return 1.055 * Math.pow(x, 1.0 / 2.4) - 0.055;
+}
