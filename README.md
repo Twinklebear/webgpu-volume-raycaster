@@ -1,9 +1,8 @@
-# WebGPU Volume Pathtracer
+# WebGPU Volume Pathtracer: Moved https://github.com/Twinklebear/webgpu-volume-pathtracer
 
 A volume raycaster using WebGPU. Try it out [online!](https://www.willusher.io/webgpu-volume-pathtracer/)
 
-The picture below is with the raycaster on the main branch.
-![](https://i.imgur.com/6zNv57i.png)
+This branch has moved to its own repo: https://github.com/Twinklebear/webgpu-volume-pathtracer
 
 ## Building
 
