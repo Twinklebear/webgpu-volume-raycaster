@@ -3,7 +3,16 @@ import {Controller} from "ez_canvas_controller";
 import {mat4, vec3} from "gl-matrix";
 
 import shaderCode from "./shaders.wgsl";
-import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from "./volume.js";
+import {
+    colormaps,
+    fetchVolume,
+    fillSelector,
+    getCubeMesh,
+    getVolumeDimensions,
+    uploadImage,
+    uploadVolume,
+    volumes
+} from "./volume.js";
 
 (async () => {
     if (navigator.gpu === undefined) {
@@ -70,57 +79,32 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         minFilter: "linear",
     });
 
-    // Upload the colormap texture
-    var colormapTexture = null;
-    {
-        var colormapImage = new Image();
-        colormapImage.src = colormaps["Cool Warm"];
-        await colormapImage.decode();
-        var imageBitmap = await createImageBitmap(colormapImage);
+    var volumePicker = document.getElementById("volumeList");
+    var colormapPicker = document.getElementById("colormapList");
 
-        colormapTexture = device.createTexture({
-            size: [imageBitmap.width, imageBitmap.height, 1],
-            format: "rgba8unorm",
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
-                       GPUTextureUsage.RENDER_ATTACHMENT
-        });
-
-        var src = {source: imageBitmap};
-        var dst = {texture: colormapTexture};
-        device.queue.copyExternalImageToTexture(
-            src, dst, [imageBitmap.width, imageBitmap.height]);
-    }
+    fillSelector(volumePicker, volumes);
+    fillSelector(colormapPicker, colormaps);
 
     // Fetch and upload the volume
-    var volumeName = "Foot";
-    var volumeDims = getVolumeDimensions(volumes[volumeName]);
-    var volumeTexture = device.createTexture({
-        size: volumeDims,
-        format: "r8unorm",
-        dimension: "3d",
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
-    });
-    {
-        var volumeData = await fetchVolume(volumes[volumeName]);
-
-        var volumeUploadBuf = device.createBuffer(
-            {size: volumeData.length, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
-        new Uint8Array(volumeUploadBuf.getMappedRange()).set(volumeData);
-        volumeUploadBuf.unmap();
-
-        var commandEncoder = device.createCommandEncoder();
-
-        var src = {
-            buffer: volumeUploadBuf,
-            // NOTE: bytes per row must be multiple of 256
-            bytesPerRow: volumeDims[0],
-            rowsPerImage: volumeDims[1]
-        };
-        var dst = {texture: volumeTexture};
-        commandEncoder.copyBufferToTexture(src, dst, volumeDims);
-
-        await device.queue.submit([commandEncoder.finish()]);
+    var volumeName = "Bonsai";
+    if (window.location.hash) {
+        var linkedDataset = decodeURI(window.location.hash.substring(1));
+        if (linkedDataset in volumes) {
+            volumePicker.value = linkedDataset;
+            volumeName = linkedDataset;
+        } else {
+            alert(`Linked to invalid data set ${linkedDataset}`);
+            return;
+        }
     }
+
+    var colormapName = "Cool Warm";
+    var colormapTexture = await uploadImage(device, colormaps[colormapName]);
+
+    var volumeDims = getVolumeDimensions(volumes[volumeName]);
+    var volumeTexture =
+        await fetchVolume(volumes[volumeName])
+            .then((volumeData) => { return uploadVolume(device, volumeDims, volumeData); });
 
     // Setup render outputs
     var swapChainFormat = "bgra8unorm";
@@ -134,17 +118,6 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
             {binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {viewDimension: "2d"}},
             {binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {type: "filtering"}}
         ]
-    });
-
-    var viewParamBG = device.createBindGroup({
-        layout: bindGroupLayout,
-        entries: [
-            {binding: 0, resource: {buffer: viewParamsBuffer}},
-            {binding: 1, resource: volumeTexture.createView()},
-            {binding: 2, resource: colormapTexture.createView()},
-            {binding: 3, resource: sampler},
-        ]
-
     });
 
     // Create render pipeline
@@ -218,11 +191,46 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
     };
     requestAnimationFrame(animationFrame);
 
+    var bindGroupEntries = [
+        {binding: 0, resource: {buffer: viewParamsBuffer}},
+        {binding: 1, resource: volumeTexture.createView()},
+        {binding: 2, resource: colormapTexture.createView()},
+        {binding: 3, resource: sampler},
+    ];
+    var bindGroup =
+        device.createBindGroup({layout: bindGroupLayout, entries: bindGroupEntries});
+
     while (true) {
         await animationFrame();
         if (document.hidden) {
             continue;
         }
+
+        // Fetch a new volume or colormap if a new one was selected
+        if (volumeName != volumePicker.value) {
+            volumeName = volumePicker.value;
+            history.replaceState(history.state, "", "#" + volumeName);
+
+            volumeDims = getVolumeDimensions(volumes[volumeName]);
+
+            volumeTexture = await fetchVolume(volumes[volumeName]).then((volumeData) => {
+                return uploadVolume(device, volumeDims, volumeData);
+            });
+
+            bindGroupEntries[1].resource = volumeTexture.createView();
+            bindGroup =
+                device.createBindGroup({layout: bindGroupLayout, entries: bindGroupEntries});
+        }
+
+        if (colormapName != colormapPicker.value) {
+            colormapName = colormapPicker.value;
+            colormapTexture = await uploadImage(device, colormaps[colormapName]);
+
+            bindGroupEntries[2].resource = colormapTexture.createView();
+            bindGroup =
+                device.createBindGroup({layout: bindGroupLayout, entries: bindGroupEntries});
+        }
+
         // Update camera buffer
         projView = mat4.mul(projView, proj, camera.camera);
 
@@ -243,7 +251,7 @@ import {colormaps, fetchVolume, getCubeMesh, getVolumeDimensions, volumes} from 
         var renderPass = commandEncoder.beginRenderPass(renderPassDesc);
 
         renderPass.setPipeline(renderPipeline);
-        renderPass.setBindGroup(0, viewParamBG);
+        renderPass.setBindGroup(0, bindGroup);
         renderPass.setVertexBuffer(0, vertexBuffer);
         renderPass.setIndexBuffer(indexBuffer, "uint16");
         renderPass.draw(cube.vertices.length / 3, 1, 0, 0);
