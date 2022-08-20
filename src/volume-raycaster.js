@@ -108,8 +108,12 @@ import {
 
     // Setup render outputs
     var swapChainFormat = "bgra8unorm";
-    context.configure(
-        {device: device, format: swapChainFormat, usage: GPUTextureUsage.OUTPUT_ATTACHMENT});
+    context.configure({
+        device: device,
+        format: swapChainFormat,
+        usage: GPUTextureUsage.OUTPUT_ATTACHMENT,
+        alphaMode: "premultiplied"
+    });
 
     var bindGroupLayout = device.createBindGroupLayout({
         entries: [
@@ -156,7 +160,12 @@ import {
     });
 
     var renderPassDesc = {
-        colorAttachments: [{view: undefined, loadOp: "clear", clearValue: [0.3, 0.3, 0.3, 1]}]
+        colorAttachments: [{
+            view: undefined,
+            loadOp: "clear",
+            clearValue: [0.3, 0.3, 0.3, 1],
+            storeOp: "store"
+        }]
     };
 
     var camera = new ArcballCamera(defaultEye, center, up, 2, [canvas.width, canvas.height]);
@@ -200,6 +209,12 @@ import {
     var bindGroup =
         device.createBindGroup({layout: bindGroupLayout, entries: bindGroupEntries});
 
+    var upload = device.createBuffer({
+        size: 20 * 4,
+        usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC,
+        mappedAtCreation: false
+    });
+
     while (true) {
         await animationFrame();
         if (document.hidden) {
@@ -234,9 +249,8 @@ import {
         // Update camera buffer
         projView = mat4.mul(projView, proj, camera.camera);
 
-        var upload = device.createBuffer(
-            {size: 20 * 4, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
         {
+            await upload.mapAsync(GPUMapMode.WRITE);
             var eyePos = camera.eyePos();
             var map = new Float32Array(upload.getMappedRange());
             map.set(projView);
@@ -258,8 +272,5 @@ import {
 
         renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
-
-        // Explicitly release the GPU buffer instead of waiting for GC
-        upload.destroy();
     }
 })();
