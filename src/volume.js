@@ -24,15 +24,13 @@ export const colormaps = {
     "Samsel Linear YGB 1211G": samselYgb,
 };
 
-export function getVolumeDimensions(file)
-{
+export function getVolumeDimensions(file) {
     var fileRegex = /(\w+)_(\d+)x(\d+)x(\d+)_(\w+)\.*/;
     var m = file.match(fileRegex);
     return [parseInt(m[2]), parseInt(m[3]), parseInt(m[4])];
 }
 
-export function getCubeMesh()
-{
+export function getCubeMesh() {
     var cubeVertices = [
         1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0,
         1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0
@@ -45,13 +43,11 @@ export function getCubeMesh()
     return {vertices: cubeVertices, indices: cubeIndices};
 }
 
-export function alignTo(val, align)
-{
+export function alignTo(val, align) {
     return Math.floor((val + align - 1) / align) * align;
 };
 
-function padVolume(buf, volumeDims)
-{
+function padVolume(buf, volumeDims) {
     const paddedVolumeDims = [alignTo(volumeDims[0], 256), volumeDims[1], volumeDims[2]];
     var padded =
         new Uint8Array(paddedVolumeDims[0] * paddedVolumeDims[1] * paddedVolumeDims[2]);
@@ -64,8 +60,7 @@ function padVolume(buf, volumeDims)
     return padded;
 }
 
-export async function fetchVolume(file)
-{
+export async function fetchVolume(file) {
     const volumeDims = getVolumeDimensions(file);
     const volumeSize = volumeDims[0] * volumeDims[1] * volumeDims[2];
 
@@ -106,8 +101,7 @@ export async function fetchVolume(file)
     return null;
 }
 
-export async function uploadVolume(device, volumeDims, volumeData)
-{
+export async function uploadVolume(device, volumeDims, volumeData) {
     var volumeTexture = device.createTexture({
         size: volumeDims,
         format: "r8unorm",
@@ -137,8 +131,7 @@ export async function uploadVolume(device, volumeDims, volumeData)
     return volumeTexture;
 }
 
-export async function uploadImage(device, imageSrc)
-{
+export async function uploadImage(device, imageSrc) {
     var image = new Image();
     image.src = imageSrc;
     await image.decode();
@@ -148,7 +141,7 @@ export async function uploadImage(device, imageSrc)
         size: [bitmap.width, bitmap.height, 1],
         format: "rgba8unorm",
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST |
-                   GPUTextureUsage.RENDER_ATTACHMENT
+            GPUTextureUsage.RENDER_ATTACHMENT
     });
 
     var src = {source: bitmap};
@@ -159,16 +152,14 @@ export async function uploadImage(device, imageSrc)
     return texture;
 }
 
-export function linearToSRGB(x)
-{
+export function linearToSRGB(x) {
     if (x <= 0.0031308) {
         return 12.92 * x;
     }
     return 1.055 * Math.pow(x, 1.0 / 2.4) - 0.055;
 }
 
-export function fillSelector(selector, dict)
-{
+export function fillSelector(selector, dict) {
     for (var v in dict) {
         var opt = document.createElement("option");
         opt.value = v;
@@ -177,8 +168,7 @@ export function fillSelector(selector, dict)
     }
 }
 
-export function sphericalDir(theta, phi)
-{
+export function sphericalDir(theta, phi) {
     const cosTheta = Math.cos(theta);
     const sinTheta = Math.sin(theta);
     return [Math.cos(phi) * sinTheta, Math.sin(phi) * sinTheta, cosTheta];
