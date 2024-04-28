@@ -192,14 +192,6 @@ import {
     };
     controller.registerForCanvas(canvas);
 
-    var animationFrame = function() {
-        var resolve = null;
-        var promise = new Promise(r => resolve = r);
-        window.requestAnimationFrame(resolve);
-        return promise
-    };
-    requestAnimationFrame(animationFrame);
-
     var bindGroupEntries = [
         {binding: 0, resource: {buffer: viewParamsBuffer}},
         {binding: 1, resource: volumeTexture.createView()},
@@ -215,12 +207,7 @@ import {
         mappedAtCreation: false
     });
 
-    while (true) {
-        await animationFrame();
-        if (document.hidden) {
-            continue;
-        }
-
+    const render = async () => {
         // Fetch a new volume or colormap if a new one was selected
         if (volumeName != volumePicker.value) {
             volumeName = volumePicker.value;
@@ -272,5 +259,7 @@ import {
 
         renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
-    }
+        requestAnimationFrame(render);
+    };
+    requestAnimationFrame(render);
 })();
